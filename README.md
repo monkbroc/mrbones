@@ -8,11 +8,11 @@ Controls the motors and receives controls over BLE.
 
 Hardware configuration:
 
-- Direction PWM: D1
-- Direction left (forward): D2
-- Direction right (reverse): D3
+- Direction left (forward): A0
+- Direction right (reverse): A1
+- Direction PWM: A2
 - Wheels PWM: A5
-- Wheels direction: S4
+- Wheels reverse: S4
 
 ## ble-controller
 

@@ -11,18 +11,25 @@
 SYSTEM_MODE(AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 
-SerialLogHandler logHandler(LOG_LEVEL_INFO);
+SerialLogHandler logHandler(LOG_LEVEL_WARN, {	{ "app", LOG_LEVEL_INFO } });
 
-const auto DIRECTION_POWER = D1;
-const auto DIRECTION_LEFT = D2;
-const auto DIRECTION_RIGHT = D3;
+const auto DIRECTION_PWM = A2;
+const auto DIRECTION_LEFT = A0;
+const auto DIRECTION_RIGHT = A1;
+
+const auto WHEELS_PWM = A5;
+const auto WHEELS_REVERSE = S4;
 
 // Turn off outputs after this amount of time without BLE controls update
 const auto SAFETY_SHUTOFF_TIME = 1000;
 
 int16_t x = 0, y = 0;
 boolean sw = false;
-uint8_t counter;
+uint8_t counter = 0;
+bool safetyShutoff = true;
+
+int16_t wheelsPower = 0;
+bool wheelsReverse = false;
 
 static const BleUuid serviceUuid("363f1314-4a0d-4332-ab1b-b4c52469e573");
 static const BleUuid controlsUuid("363f1315-4a0d-4332-ab1b-b4c52469e573");
@@ -46,7 +53,13 @@ void loop() {
     bleConnect();
   }
 
-  Log.info("x=%4d y=%4d sw=%d counter=%d", x, y, sw ? 1 : 0, counter);
+  // Log.info("x=%4d y=%4d sw=%d counter=%d", x, y, sw ? 1 : 0, counter);
+  static bool oldSafetyShutoff = safetyShutoff;
+  if (safetyShutoff != oldSafetyShutoff) {
+      Log.info(safetyShutoff ? "Safety shutoff" : "Starting motor operation");
+  }
+  oldSafetyShutoff = safetyShutoff;
+
   delay(100);
 }
 
@@ -97,27 +110,40 @@ void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, 
   counter = controls->counter;
 }
 
+int16_t cube(int16_t v) {
+  const auto INPUT_RANGE = 11;
+  return (((v * abs(v)) >> INPUT_RANGE) * abs(v)) >> INPUT_RANGE;
+}
+
 void runHardware() {
   uint8_t lastCounter = 0;
   system_tick_t lastUpdate = 0;
-
-  pinMode(DIRECTION_POWER, OUTPUT);
+  
+  pinMode(DIRECTION_PWM, OUTPUT);
   pinMode(DIRECTION_LEFT, OUTPUT);
   pinMode(DIRECTION_RIGHT, OUTPUT);
   
   while (true) {
     if (counter != lastCounter) {
       lastUpdate = millis();
+      lastCounter = counter;
+      safetyShutoff = false;
     }
     if (millis() - lastUpdate > SAFETY_SHUTOFF_TIME) {
+      safetyShutoff = true;
+    }
+
+    if (safetyShutoff) {
       digitalWrite(DIRECTION_LEFT, LOW);
       digitalWrite(DIRECTION_RIGHT, LOW);
-      analogWrite(DIRECTION_POWER, 0, 10000);
-
+      analogWrite(DIRECTION_PWM, 0, 10000);
     } else {
-      digitalWrite(DIRECTION_LEFT, y > 0 ? HIGH : LOW);
-      digitalWrite(DIRECTION_RIGHT, y > 0 ? LOW : (y == 0 ? LOW : HIGH));
-      analogWrite(DIRECTION_POWER, abs(y), 10000);
+      // direction power
+      auto d = cube(y) / (2048/256);
+
+      digitalWrite(DIRECTION_LEFT, d > 0 ? HIGH : LOW);
+      digitalWrite(DIRECTION_RIGHT, d > 0 ? LOW : (y == 0 ? LOW : HIGH));
+      analogWrite(DIRECTION_PWM, abs(d), 10000);
     }
   }
 }

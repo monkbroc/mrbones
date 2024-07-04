@@ -4,7 +4,8 @@
     "files.associations": {
         "*.ino": "cpp"
     },
-    "particle.firmwareVersion": "5.8.0",
+    "particle.firmwareVersion": "5.8.2",
     "particle.targetPlatform": "p2",
-    "particle.targetDevice": "0a10aced202194944a040960"
+    "particle.targetDevice": "0a10aced202194944a040960",
+    "particle.enablePre-releaseDeviceOSBuilds": true
 }

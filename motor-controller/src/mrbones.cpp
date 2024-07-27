@@ -27,7 +27,31 @@ void setup() {
   BLE.on();
 }
 
+struct GamepadData {
+  uint16_t x1;
+  uint16_t y1;
+  uint16_t x2;
+  uint16_t y2;
+  uint16_t leftTrigger;
+  uint16_t rightTrigger;
+  uint8_t dpad;
+  bool a;
+  bool b;
+  bool x;
+  bool y;
+  bool leftBumper;
+  bool rightBumper;
+  bool leftStick;
+  bool rightStick;
+  bool view;
+  bool share;
+  bool menu;
+} gamepadData;
+
+uint8_t data[16] = {0};
+
 void loop() {
+  static auto lastUpdate = millis();
   if (!BLE.connected()) {
     BleAddress addr("40:8E:2C:61:9e:20");
     Log.info("Connecting to %s...", addr.toString().c_str());
@@ -45,17 +69,9 @@ void loop() {
       }
 
       for (auto& ch : peer.characteristics()) {
-        Log.info("characteristic uuid=%s props=%u desc=%s", ch.UUID().toString().c_str(), ch.properties().value(), ch.description().c_str());
-        if (ch.UUID() == reportUuid) {
-          Log.info("found report");
-        }
-        if (ch.properties() & BleCharacteristicProperty::NOTIFY) {
-          Log.info("found notify");
-        }
         if (ch.UUID() == reportUuid && (ch.properties() & BleCharacteristicProperty::NOTIFY)) {
           inputReportCharacteristic = ch;
           inputReportCharacteristic.onDataReceived(onDataReceived, NULL);
-          Log.info("Connected to input report characteristic");
         }
       }
 
@@ -73,61 +89,58 @@ void loop() {
     } else {
       Log.info("connection failed");
     }
+    delay(500);
+  } else {
+    if (millis() - lastUpdate > 100) {
+      // Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12], data[13], data[14], data[15]);
+      Log.info(  "x1=%5d y1=%5d x2=%5d y2=%5d lt=%4d rt=%4sd dpad=%d %s %s %s %s %s %s %s %s %s %s %s", gamepadData.x1,
+        gamepadData.y1,
+        gamepadData.x2,
+        gamepadData.y2,
+        gamepadData.leftTrigger,
+        gamepadData.rightTrigger,
+        gamepadData.dpad,
+        gamepadData.a ? "a" : " ",
+        gamepadData.b ? "b" : " ",
+        gamepadData.x ? "x" : " ",
+        gamepadData.y ? "y" : " ",
+        gamepadData.leftBumper ? "lb" : "  ",
+        gamepadData.rightBumper ? "rb" : "  ",
+        gamepadData.leftStick ? "ls" : "  ",
+        gamepadData.rightStick ? "rs" : "  ",
+        gamepadData.view ? "view" : "    ",
+        gamepadData.share ? "share" : "     ",
+        gamepadData.menu ? "menu" : "    "
+      );
+      lastUpdate = millis();
+    }
   }
-
-  delay(500);
 }
 
-void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context) {
-  Log.info("input %d bytes", len);
-  while (len >= 16) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12], data[13], data[14], data[15]);
-    len -= 16;
-  }
-  if (len == 15) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12], data[13], data[14]);
-  }
-  if (len == 14) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12], data[13]);
-  }
-  if (len == 13) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12]);
-  }
-  if (len == 12) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11]);
-  }
-  if (len == 11) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10]);
-  }
-  if (len == 10) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9]);
-  }
-  if (len == 9) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
-  }
-  if (len == 8) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
-  }
-  if (len == 7) {
-    Log.info("%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6]);
-  }
-  if (len == 6) {
-    Log.info("%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5]);
-  }
-  if (len == 5) {
-    Log.info("%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4]);
-  }
-  if (len == 4) {
-    Log.info("%02x%02x%02x%02x", data[0], data[1], data[2], data[3]);
-  }
-  if (len == 3) {
-    Log.info("%02x%02x%02x", data[0], data[1], data[2]);
-  }
-  if (len == 2) {
-    Log.info("%02x%02x", data[0], data[1]);
-  }
-  if (len == 1) {
-    Log.info("%02x", data[0]);
+void onDataReceived(const uint8_t* d, size_t len, const BlePeerDevice& peer, void* context) {
+  if (len == 16) {
+    memcpy(data, d, len);
+    gamepadData.x1 = d[1] << 8 | d[0];
+    gamepadData.y1 = d[3] << 8 | d[2];
+    gamepadData.x2 = d[5] << 8 | d[4];
+    gamepadData.y2 = d[7] << 8 | d[6];
+    gamepadData.leftTrigger = d[9] << 8 | d[8];
+    gamepadData.rightTrigger = d[11] << 8 | d[10];
+    gamepadData.dpad = d[12];
+    gamepadData.a = d[13] & 0x01;
+    gamepadData.b = d[13] & 0x02;
+    gamepadData.x = d[13] & 0x08;
+    gamepadData.y = d[13] & 0x10;
+    gamepadData.leftBumper = d[13] & 0x40;
+    gamepadData.rightBumper = d[13] & 0x80;
+    gamepadData.leftStick = d[14] & 0x20;
+    gamepadData.rightStick = d[14] & 0x40;
+    gamepadData.view = d[14] & 0x04;
+    gamepadData.share = d[15] & 0x01;
+    gamepadData.menu = d[14] & 0x08;
+
+  } else {
+    Log.info("Unexpected payload of %d bytes", len);
   }
 }
 

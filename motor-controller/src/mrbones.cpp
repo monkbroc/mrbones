@@ -33,12 +33,17 @@ const auto SAFETY_SHUTOFF_TIME = 1000;
 std::vector<int16_t> throttleRanges = {0, 10, 500, 750, 1000, 1024};
 std::vector<int16_t> throttleValues = {0, 0, 40, 60, 80, 150};
 
+int16_t TURN_FACTOR = 262;
+int16_t TURN_P = 4;
+
 int16_t turn = 0;
 int32_t throttle = 0;
 bool safetyShutoff = true;
 int16_t wt = 0;
 
 int32_t turnAngle = 0;
+uint8_t encoderState = 0;
+int16_t turnPower = 0;
 
 Thread *hardwareThread;
 
@@ -46,13 +51,14 @@ void runHardware();
 
 void setup()
 {
-  Particle.function("t", [&](String arg) {
-    throttleValues[1] = arg.toInt();
-    return throttleValues[1];
+  Particle.function("f", [&](String arg) {
+    TURN_FACTOR = arg.toInt();
+    return TURN_FACTOR;
   });
-
-  attachInterrupt(DIRECTION_ENCODER1, 
-  
+  Particle.function("p", [&](String arg) {
+    TURN_P = arg.toInt();
+    return TURN_P;
+  });
 
   hardwareThread = new Thread("hardware", runHardware);
   gamepad.begin();
@@ -65,21 +71,17 @@ void loop()
 
   if (gamepad.valid())
   {
-    Log.info("x=%5d turn=%3d t=%4ld wt=%4d", gamepad.x1, turn, throttle, wt);
+    Log.info("x=%5d turn=%4d angle=%4ld pow=%4d t=%4ld wt=%4d", gamepad.x1, turn, turnAngle, turnPower, throttle, wt);
     delay(100);
   }
 }
 
 // multiple the input by itself a number of times to make controls non-linear
-int32_t cube(int32_t v, int inputRange)
+float cube(float v)
 {
-  if (v == (2 << inputRange) - 1)
-  {
-    return v;
-  }
   for (auto i = 0; i < 3; i++)
   {
-    v = (v * abs(v)) >> inputRange;
+    v = v * abs(v);
   }
   return v;
 }
@@ -109,22 +111,50 @@ int applySlewRate(int actual, int target, int maxChange)
   return actual;
 }
 
+uint8_t readEncoder();
+void encoderInterrupt();
+
 void runHardware()
 {
   system_tick_t lastSlew = 0;
   int16_t w = 0;
+  uint8_t oldDpad = 0;
 
   pinMode(DIRECTION_PWM, OUTPUT);
   pinMode(DIRECTION_LEFT, OUTPUT);
   pinMode(DIRECTION_RIGHT, OUTPUT);
+  pinMode(DIRECTION_ENCODER1, INPUT_PULLUP);
+  pinMode(DIRECTION_ENCODER2, INPUT_PULLUP);
 
   pinMode(WHEELS_PWM, OUTPUT);
   pinMode(WHEELS_REVERSE, OUTPUT);
 
+  encoderState = readEncoder();
+
+  attachInterrupt(DIRECTION_ENCODER1, encoderInterrupt, CHANGE);
+  attachInterrupt(DIRECTION_ENCODER2, encoderInterrupt, CHANGE);
+
   while (true)
   {
-    // direction PWM
-    turn = (int16_t)-cube((int32_t)gamepad.x1 - 32768, 15) / (32768 / 256);
+    // trim the turn angle with the D-pad
+    const auto DPAD_LEFT = 7;
+    const auto DPAD_RIGHT = 3;
+    uint8_t dpad = gamepad.dpad;
+    if (oldDpad == 0 && dpad != 0) {
+      SINGLE_THREADED_SECTION();
+      if (dpad == DPAD_LEFT) {
+        turnAngle += 10;
+      }
+      if (dpad == DPAD_RIGHT) {
+        turnAngle -= 10;
+      }
+    }
+    oldDpad = dpad;
+
+    // direction controller
+    turn = (uint16_t)(((int32_t)gamepad.x1 - 32768) / TURN_FACTOR);
+    int16_t error = turnAngle - turn;
+    turnPower = std::min<int16_t>(std::max<int16_t>(error * TURN_P, -255), 255);
 
     // wheels PWM
     throttle = (int32_t)gamepad.leftTrigger - gamepad.rightTrigger;
@@ -147,12 +177,41 @@ void runHardware()
     }
     else
     {
-      digitalWrite(DIRECTION_LEFT, turn > 0 ? HIGH : LOW);
-      digitalWrite(DIRECTION_RIGHT, turn > 0 ? LOW : (turn == 0 ? LOW : HIGH));
-      analogWrite(DIRECTION_PWM, abs(turn), 10000);
+      digitalWrite(DIRECTION_LEFT, turnPower > 0 ? HIGH : LOW);
+      digitalWrite(DIRECTION_RIGHT, turnPower > 0 ? LOW : (turnPower == 0 ? LOW : HIGH));
+      analogWrite(DIRECTION_PWM, abs(turnPower), 10000);
 
       digitalWrite(WHEELS_REVERSE, w > 0 ? LOW : HIGH);
       analogWrite(WHEELS_PWM, abs(w), 10000);
     }
+  }
+}
+
+uint8_t readEncoder() {
+  return ((uint8_t)digitalRead(DIRECTION_ENCODER1) << 1) | ((uint8_t) digitalRead(DIRECTION_ENCODER2));
+}
+
+void encoderInterrupt() {
+  // bits 2-3 are old state and bits 0-1 are new state
+  encoderState = ((encoderState & 0x03) << 2) | readEncoder();
+
+  switch (encoderState) {
+    case 0b0001:
+    case 0b0111:
+    case 0b1110:
+    case 0b1000:
+      // forward rotation
+      turnAngle++;
+      break;
+    case 0b0010:
+    case 0b1011:
+    case 0b1101:
+    case 0b0100:
+      // backward rotation
+      turnAngle--;
+      break;
+    default:
+      // other combinations are either no movement or unexpected case. don't move
+      break;
   }
 }

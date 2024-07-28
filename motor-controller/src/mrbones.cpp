@@ -31,9 +31,9 @@ const auto SAFETY_SHUTOFF_TIME = 1000;
 
 // Throttle map between input 0:1024 to motor 0:255
 std::vector<int16_t> throttleRanges = {0, 10, 500, 750, 1000, 1024};
-std::vector<int16_t> throttleValues = {0, 0, 40, 60, 80, 150};
+std::vector<int16_t> throttleValues = {0,  0,  40,  100,  200,  255};
 
-int16_t TURN_FACTOR = 262;
+int16_t TURN_FACTOR = 200;
 int16_t TURN_P = 4;
 
 int16_t turn = 0;
@@ -157,7 +157,7 @@ void runHardware()
     turnPower = std::min<int16_t>(std::max<int16_t>(error * TURN_P, -255), 255);
 
     // wheels PWM
-    throttle = (int32_t)gamepad.leftTrigger - gamepad.rightTrigger;
+    throttle = (int32_t)gamepad.rightTrigger - gamepad.leftTrigger;
     wt = interpolate(throttleRanges, throttleValues, (int16_t)abs(throttle)) * (throttle > 0 ? 1 : -1);
 
     if (millis() - lastSlew > 10)

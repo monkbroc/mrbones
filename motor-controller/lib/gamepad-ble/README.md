@@ -8,7 +8,6 @@ Particle boards with built-in BLE are compatible.
 
 * Photon 2 / P2
 
-
 Note: The Argon and Boron have built-in BLE but there's an issue pairing with the Xbox controller so it's not listed in the compatible list yet.
 
 ## Compatible gamepads
@@ -53,7 +52,9 @@ Turns on BLE.
 
 ### `Gamepad.process()`
 
-Blocks for up to 10 seconds to scan for BLE gamepads, connect and pair to the first one.
+Blocks for up to 5 seconds to scan and connect to BLE gamepads.
+
+When it finds a BLE gamepad, it connect and pair to the first one.
 
 ### `Gamepad.valid()`
 

@@ -6,12 +6,13 @@
 // This will load the definition for common Particle variable types
 #include "Particle.h"
 
-class Gamepad {
+class Gamepad
+{
 public:
   /**
    * Function to parse the data to buttons
    */
-  using ParseDataFunction = std::function<void(Gamepad&, const uint8_t*, size_t)>;
+  using ParseDataFunction = std::function<void(Gamepad &, const uint8_t *, size_t)>;
 
   /**
    * Constructor

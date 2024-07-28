@@ -2,9 +2,11 @@
     "extensions.ignoreRecommendations": true,
     "C_Cpp.default.configurationProvider": "particle.particle-vscode-core",
     "files.associations": {
-        "*.ino": "cpp"
+        "*.ino": "cpp",
+        "type_traits": "cpp"
     },
     "particle.firmwareVersion": "5.8.2",
-    "particle.targetPlatform": "argon",
-    "particle.enablePre-releaseDeviceOSBuilds": true
+    "particle.targetPlatform": "p2",
+    "particle.enablePre-releaseDeviceOSBuilds": true,
+    "particle.targetDevice": "motor_driver"
 }

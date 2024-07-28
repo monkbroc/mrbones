@@ -82,8 +82,8 @@ Gamepad::Gamepad(ParseDataFunction customParseFunction) : Gamepad()
 void Gamepad::begin()
 {
   BLE.on();
-  // Only scan for 500 milliseconds
-  BLE.setScanTimeout(50);
+  // Only scan for 1 second
+  BLE.setScanTimeout(100);
 }
 
 /**
@@ -124,9 +124,9 @@ void Gamepad::connect()
 
   BleAddress addr = devices.first().address();
   Log.info("Connecting to %s...", addr.toString().c_str());
-  BleConnectionParams params;
-  params.conn_sup_timeout = 100; // timeout BLE connection after 1 second
-  peer = BLE.connect(addr, params);
+  // BleConnectionParams params;
+  // params.conn_sup_timeout = 100; // timeout BLE connection after 1 second
+  peer = BLE.connect(addr);
   if (peer.connected())
   {
     name = "?";

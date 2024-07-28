@@ -20,6 +20,8 @@ Gamepad gamepad;
 const auto DIRECTION_PWM = A2;
 const auto DIRECTION_LEFT = A0;
 const auto DIRECTION_RIGHT = A1;
+const auto DIRECTION_ENCODER1 = D2;
+const auto DIRECTION_ENCODER2 = D3;
 
 const auto WHEELS_PWM = A5;
 const auto WHEELS_REVERSE = S4;
@@ -31,11 +33,12 @@ const auto SAFETY_SHUTOFF_TIME = 1000;
 std::vector<int16_t> throttleRanges = {0, 10, 500, 750, 1000, 1024};
 std::vector<int16_t> throttleValues = {0, 0, 40, 60, 80, 150};
 
-int16_t turn;
+int16_t turn = 0;
 int32_t throttle = 0;
 bool safetyShutoff = true;
-
 int16_t wt = 0;
+
+int32_t turnAngle = 0;
 
 Thread *hardwareThread;
 
@@ -43,10 +46,13 @@ void runHardware();
 
 void setup()
 {
-  Particle.function("t", [&](String arg)
-                    {
+  Particle.function("t", [&](String arg) {
     throttleValues[1] = arg.toInt();
-    return throttleValues[1]; });
+    return throttleValues[1];
+  });
+
+  attachInterrupt(DIRECTION_ENCODER1, 
+  
 
   hardwareThread = new Thread("hardware", runHardware);
   gamepad.begin();
@@ -118,7 +124,7 @@ void runHardware()
   while (true)
   {
     // direction PWM
-    turn = (int16_t)cube((int32_t)gamepad.x1 - 32768, 15) / (32768 / 256);
+    turn = (int16_t)-cube((int32_t)gamepad.x1 - 32768, 15) / (32768 / 256);
 
     // wheels PWM
     throttle = (int32_t)gamepad.leftTrigger - gamepad.rightTrigger;

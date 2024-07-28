@@ -5,7 +5,6 @@
         "*.ino": "cpp"
     },
     "particle.firmwareVersion": "5.8.2",
-    "particle.targetPlatform": "p2",
-    "particle.targetDevice": "0a10aced202194944a040960",
+    "particle.targetPlatform": "argon",
     "particle.enablePre-releaseDeviceOSBuilds": true
 }

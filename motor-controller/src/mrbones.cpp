@@ -7,6 +7,7 @@
  */
 
 #include "Particle.h"
+#include "gamepad-ble.h"
 #include "lut.h"
 
 SYSTEM_MODE(AUTOMATIC);
@@ -14,86 +15,22 @@ SYSTEM_THREAD(ENABLED);
 
 SerialLogHandler logHandler(LOG_LEVEL_NONE, {	{ "app", LOG_LEVEL_INFO } });
 
-BlePeerDevice peer;
-
-// BleUuid hidUuid(0x1812);
-// BleService hidService;
-BleUuid reportUuid(0x2A4D);
-BleCharacteristic inputReportCharacteristic;
-
-void onDataReceived(const uint8_t* data, size_t len, const BlePeerDevice& peer, void* context);
+Gamepad gamepad;
 
 void setup() {
-  BLE.on();
+  gamepad.begin();
 }
 
-struct GamepadData {
-  uint16_t x1;
-  uint16_t y1;
-  uint16_t x2;
-  uint16_t y2;
-  uint16_t leftTrigger;
-  uint16_t rightTrigger;
-  uint8_t dpad;
-  bool a;
-  bool b;
-  bool x;
-  bool y;
-  bool leftBumper;
-  bool rightBumper;
-  bool leftStick;
-  bool rightStick;
-  bool view;
-  bool share;
-  bool menu;
-} gamepadData;
-
-uint8_t data[16] = {0};
-
 void loop() {
+  gamepad.process();
   static auto lastUpdate = millis();
-  if (!BLE.connected()) {
-    BleAddress addr("40:8E:2C:61:9e:20");
-    Log.info("Connecting to %s...", addr.toString().c_str());
-    peer = BLE.connect(addr);
-    if (peer.connected()) {
-      Log.info("successfully connected");
-      BLE.startPairing(peer);
-      while (BLE.isPairing(peer)) {
-        delay(100);
-      }
-      if (BLE.isPaired(peer)) {
-        Log.info("paired");
-      } else {
-        Log.info("pairing failed");
-      }
-
-      for (auto& ch : peer.characteristics()) {
-        if (ch.UUID() == reportUuid && (ch.properties() & BleCharacteristicProperty::NOTIFY)) {
-          inputReportCharacteristic = ch;
-          inputReportCharacteristic.onDataReceived(onDataReceived, NULL);
-        }
-      }
-
-      // peer.getServiceByUUID(hidService, hidUuid);
-      // auto characteristics = peer.discoverCharacteristicsOfService(hidService);
-      // Log.info("%d characteristics", characteristics.size());
-      // for (auto it = characteristics.begin(); it != characteristics.end(); ++it) {
-      //   Log.info("characteristic %s", it->UUID().toString().c_str());
-      // }
-      // 2A4A HID info
-      // 2A4C HID control point
-      // 2A4B Report map
-      // 2A4D Report (Input, output, feature total 2 characteristics)
-      // 2A4D
-    } else {
-      Log.info("connection failed");
-    }
+  if (!BLE.isPaired(peer)) {
+    connect();
     delay(500);
   } else {
     if (millis() - lastUpdate > 100) {
       // Log.info("%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12], data[13], data[14], data[15]);
-      Log.info(  "x1=%5d y1=%5d x2=%5d y2=%5d lt=%4d rt=%4sd dpad=%d %s %s %s %s %s %s %s %s %s %s %s", gamepadData.x1,
+      Log.info(  "x1=%5d y1=%5d x2=%5d y2=%5d lt=%4d rt=%4d dpad=%d %s %s %s %s %s %s %s %s %s %s %s %s", gamepadData.x1,
         gamepadData.y1,
         gamepadData.x2,
         gamepadData.y2,
@@ -108,6 +45,7 @@ void loop() {
         gamepadData.rightBumper ? "rb" : "  ",
         gamepadData.leftStick ? "ls" : "  ",
         gamepadData.rightStick ? "rs" : "  ",
+        gamepadData.xbox ? "xbox" : "    ",
         gamepadData.view ? "view" : "    ",
         gamepadData.share ? "share" : "     ",
         gamepadData.menu ? "menu" : "    "
@@ -117,9 +55,79 @@ void loop() {
   }
 }
 
+void connect() {
+  Log.info("starting scan...");
+  BleScanFilter filter;
+  filter.appearance(BLE_SIG_APPEARANCE_HID_GAMEPAD);
+  auto devices = BLE.scanWithFilter(filter);
+  Log.info("%d gamepads found", devices.size());
+  if (devices.size() == 0) {
+    return;
+  }
+
+  BleAddress addr = devices.first().address();
+  Log.info("Connecting to %s...", addr.toString().c_str());
+  peer = BLE.connect(addr);
+  if (peer.connected()) {
+    Log.info("successfully connected");
+
+    String deviceName = "?";
+    BleCharacteristic nameCharacteristic;
+    if (peer.getCharacteristicByUUID(nameCharacteristic, nameUuid)) {
+      nameCharacteristic.getValue(deviceName);
+    }
+    Log.info("name=%s", deviceName.c_str());
+
+    BLE.startPairing(peer);
+    while (BLE.isPairing(peer)) {
+      delay(100);
+    }
+    if (BLE.isPaired(peer)) {
+      Log.info("paired");
+    } else {
+      Log.info("pairing failed");
+      peer.disconnect();
+      return;
+    }
+
+    for (auto& ch : peer.characteristics()) {
+      if (ch.UUID() == reportMapUuid) {
+        // read report map to exit pairing mode
+        // don't bother parsing the report map as we support a hard-coded number of devices
+        uint8_t buf[256] = {0};
+        auto len = ch.getValue(buf, sizeof(buf));
+        Log.info("report map len=%d", len);
+      }
+
+      if (ch.UUID() == reportUuid && (ch.properties() & BleCharacteristicProperty::NOTIFY)) {
+        inputReportCharacteristic = ch;
+        inputReportCharacteristic.onDataReceived(onDataReceived, NULL);
+      }
+    }
+
+    // peer.getServiceByUUID(hidService, hidUuid);
+    // auto characteristics = peer.discoverCharacteristicsOfService(hidService);
+    // Log.info("%d characteristics", characteristics.size());
+    // for (auto it = characteristics.begin(); it != characteristics.end(); ++it) {
+    //   Log.info("characteristic %s", it->UUID().toString().c_str());
+    // }
+    // 2A4A HID info
+    // 2A4C HID control point
+    // 2A4B Report map
+    // 2A4D Report (Input, output, feature total 2 characteristics)
+    // 2A4D
+  } else {
+    Log.info("connection failed");
+  }
+}
+
 void onDataReceived(const uint8_t* d, size_t len, const BlePeerDevice& peer, void* context) {
+  memcpy(data, d, len);
+  parseData(d, len);
+}
+
+void parseData(const uint8_t* d, size_t len) {
   if (len == 16) {
-    memcpy(data, d, len);
     gamepadData.x1 = d[1] << 8 | d[0];
     gamepadData.y1 = d[3] << 8 | d[2];
     gamepadData.x2 = d[5] << 8 | d[4];
@@ -135,10 +143,10 @@ void onDataReceived(const uint8_t* d, size_t len, const BlePeerDevice& peer, voi
     gamepadData.rightBumper = d[13] & 0x80;
     gamepadData.leftStick = d[14] & 0x20;
     gamepadData.rightStick = d[14] & 0x40;
+    gamepadData.xbox = d[14] & 0x10;
     gamepadData.view = d[14] & 0x04;
     gamepadData.share = d[15] & 0x01;
     gamepadData.menu = d[14] & 0x08;
-
   } else {
     Log.info("Unexpected payload of %d bytes", len);
   }

@@ -12,7 +12,7 @@ Note: The Argon and Boron have built-in BLE but there's an issue pairing with th
 
 ## Compatible gamepads
 
-* [Xbox Wireless Controller](https://www.amazon.com/dp/B088GJR4B9). The model 1914 with 3 buttons has BLE.
+* [Xbox Wireless Controller](https://www.amazon.com/dp/B088GJR4B9). The model 1914 with 3 buttons has BLE.<br>
   ![Xbox wireless controller](xbox-model-1914.jpg)
 * Other BLE controllers listed on [this list](https://bluepad32.readthedocs.io/en/latest/supported_gamepads/#bluetooth-gamepads-and-their-protocol) may also be compatible.
 

@@ -2,6 +2,8 @@
 
 Power Wheels motor controller with Xbox BLE gamepad control, powered by the Particle Photon 2.
 
+![Mr Bones](bones.jpg)
+
 ## Hardware
 
 - [MLToys motor and gearboxes](https://www.mltoys.com/collections/power-wheels-jeep-wranglers/products/stage-ii-motors-gearboxes-for-jeep-wrangler)
